@@ -56,7 +56,8 @@ export default function Home() {
             <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
             <span className="text-sm text-muted-foreground">Available for opportunities</span>
           </div>
-          <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black tracking-tighter mb-6">PASZCZUREQ</h1>
+          <img src="/logo.jpg" alt="PaszczureQ" className="w-32 h-32 sm:w-40 sm:h-40 rounded-2xl mx-auto mb-6 shadow-lg" />
+          <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black tracking-tighter mb-6">PaszczureQ</h1>
           <p className="text-xl sm:text-2xl text-muted-foreground mb-4 max-w-2xl mx-auto">
             Developer, Entrepreneur & Gaming Enthusiast
           </p>

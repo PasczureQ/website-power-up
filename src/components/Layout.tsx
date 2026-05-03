@@ -38,8 +38,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <Link to="/" className="text-xl font-bold tracking-wider hover:text-muted-foreground transition-colors">
-              PASZCZUREQ
+            <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+              <img src="/logo.jpg" alt="PaszczureQ" className="h-8 w-auto rounded" />
+              <span className="text-xl font-bold tracking-wider hidden sm:inline">PaszczureQ</span>
             </Link>
             <div className="hidden md:flex items-center space-x-1">
               {navLinks.map((link) => (
