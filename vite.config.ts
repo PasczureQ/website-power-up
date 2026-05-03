@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 3000,
     strictPort: false,
+    allowedHosts: "all",
     hmr: {
       overlay: false,
     },
