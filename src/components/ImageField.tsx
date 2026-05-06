@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Image as ImageIcon, Upload, X, Trash2 } from "lucide-react";
 import { useGallery } from "@/hooks/useLocalData";
-import { galleryApi } from "@/lib/localData";
+import { galleryApi, uploadImage } from "@/lib/localData";
 import { toast } from "sonner";
 
 interface Props {
@@ -41,22 +41,23 @@ export function ImageField({ value, onChange, label = "Image" }: Props) {
 export function GalleryModal({ onPick, onClose }: { onPick?: (url: string) => void; onClose: () => void }) {
   const gallery = useGallery();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files) return;
-    for (const file of Array.from(files)) {
-      if (file.size > 2_000_000) {
-        toast.error(`${file.name} is too large (max 2MB for local storage)`);
-        continue;
+    setBusy(true);
+    try {
+      for (const file of Array.from(files)) {
+        try {
+          await uploadImage(file);
+        } catch (err: any) {
+          toast.error(`${file.name}: ${err.message || "upload failed"}`);
+        }
       }
-      const dataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      });
-      galleryApi.add({ name: file.name, url: dataUrl, size: file.size });
+      toast.success("Uploaded");
+    } finally {
+      setBusy(false);
     }
-    toast.success("Uploaded");
   };
 
   return (
@@ -74,10 +75,11 @@ export function GalleryModal({ onPick, onClose }: { onPick?: (url: string) => vo
               onChange={(e) => handleFiles(e.target.files)}
             />
             <button
+              disabled={busy}
               onClick={() => fileRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"
             >
-              <Upload className="w-4 h-4" /> Upload
+              <Upload className="w-4 h-4" /> {busy ? "Uploading..." : "Upload"}
             </button>
             <button onClick={onClose} className="p-2 rounded-lg hover:bg-secondary">
               <X className="w-5 h-5" />
@@ -93,7 +95,7 @@ export function GalleryModal({ onPick, onClose }: { onPick?: (url: string) => vo
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {gallery.map((img) => (
-                <div key={img.id as number} className="relative group rounded-lg overflow-hidden border border-border bg-secondary">
+                <div key={img.id as string} className="relative group rounded-lg overflow-hidden border border-border bg-secondary">
                   <img src={img.url as string} alt={img.name as string} className="w-full aspect-square object-cover" />
                   <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                     {onPick && (
@@ -105,7 +107,7 @@ export function GalleryModal({ onPick, onClose }: { onPick?: (url: string) => vo
                       </button>
                     )}
                     <button
-                      onClick={() => galleryApi.remove(img.id as number)}
+                      onClick={() => galleryApi.remove(img.id as string)}
                       className="p-1.5 bg-destructive text-destructive-foreground rounded-md"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

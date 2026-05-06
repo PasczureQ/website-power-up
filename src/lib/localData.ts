@@ -1,129 +1,186 @@
-const STORAGE_KEYS = {
-  portfolio: "pasz_portfolio",
-  products: "pasz_products",
-  specs: "pasz_specs",
-  sponsors: "pasz_sponsors",
-  steam: "pasz_steam",
-  gallery: "pasz_gallery",
-  socials: "pasz_socials",
+// Shared data layer backed by Lovable Cloud.
+// Reads use the public anon client (RLS allows public read).
+// Writes go through the `admin` edge function with the admin password header.
+import { supabase } from "@/integrations/supabase/client";
+import { callAdmin } from "./api";
+
+type Item = Record<string, any>;
+
+const emit = () => window.dispatchEvent(new Event("localdata-changed"));
+
+/* ------- Field mappers (db <-> app camelCase) ------- */
+const portfolioToApp = (r: any) => ({
+  id: r.id, title: r.title, description: r.description, category: r.category,
+  imageUrl: r.image_url, videoUrl: r.video_url, link: r.link,
+  featured: r.featured, order: r.sort_order,
+});
+const portfolioToDb = (d: any) => ({
+  title: d.title, description: d.description, category: d.category,
+  image_url: d.imageUrl, video_url: d.videoUrl, link: d.link,
+  featured: !!d.featured, sort_order: Number(d.order) || 0,
+});
+
+const productToApp = (r: any) => ({
+  id: r.id, name: r.name, brand: r.brand, category: r.category, description: r.description,
+  imageUrl: r.image_url, productUrl: r.product_url, specs: r.specs || {}, rating: r.rating, featured: r.featured,
+});
+const productToDb = (d: any) => ({
+  name: d.name, brand: d.brand, category: d.category, description: d.description,
+  image_url: d.imageUrl, product_url: d.productUrl, specs: d.specs || {}, rating: d.rating, featured: !!d.featured,
+});
+
+const specToApp = (r: any) => ({
+  id: r.id, gameName: r.game_name, gameImage: r.game_image,
+  ...(r.data || {}),
+});
+const specToDb = (d: any) => {
+  const { gameName, gameImage, ...rest } = d;
+  return { game_name: gameName, game_image: gameImage, data: rest };
 };
 
-function getItems<T>(key: string): T[] {
-  try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
-}
-function setItems<T>(key: string, items: T[]) {
-  localStorage.setItem(key, JSON.stringify(items));
-  window.dispatchEvent(new Event("localdata-changed"));
-}
-function generateId(): number {
-  return Date.now() + Math.floor(Math.random() * 1000);
-}
+const sponsorToApp = (r: any) => ({
+  id: r.id, name: r.name, description: r.description,
+  logoUrl: r.logo_url, websiteUrl: r.website_url,
+  couponCode: r.coupon_code, discountText: r.discount_text,
+  featured: r.featured, order: r.sort_order,
+});
+const sponsorToDb = (d: any) => ({
+  name: d.name, description: d.description,
+  logo_url: d.logoUrl, website_url: d.websiteUrl,
+  coupon_code: d.couponCode, discount_text: d.discountText,
+  featured: !!d.featured, sort_order: Number(d.order) || 0,
+});
 
-type Item = Record<string, unknown>;
+const steamToApp = (r: any) => ({
+  id: r.id, appId: r.app_id, name: r.name, imageUrl: r.image_url,
+  hoursPlayed: r.hours_played, achievementsEarned: r.achievements_earned,
+  achievementsTotal: r.achievements_total, featured: r.featured,
+});
+const steamToDb = (d: any) => ({
+  app_id: d.appId, name: d.name, image_url: d.imageUrl,
+  hours_played: d.hoursPlayed,
+  achievements_earned: d.achievementsEarned ? Number(d.achievementsEarned) : null,
+  achievements_total: d.achievementsTotal ? Number(d.achievementsTotal) : null,
+  featured: !!d.featured,
+});
 
-function makeCrud(key: string) {
+const galleryToApp = (r: any) => ({ id: r.id, url: r.url, name: r.name });
+
+/* ------- In-memory cache + loaders ------- */
+const cache: Record<string, Item[]> = {
+  portfolio: [], products: [], specs: [], sponsors: [], steam: [], gallery: [],
+};
+const socialsCache: { data: Record<string, string> } = { data: {} };
+const siteCache: { data: Record<string, any> } = { data: {} };
+
+let loaded = false;
+export async function loadAll() {
+  const [p, pr, sp, so, st, ga, soc, sc] = await Promise.all([
+    supabase.from("portfolio").select("*").order("sort_order"),
+    supabase.from("products").select("*").order("created_at"),
+    supabase.from("specs").select("*").order("created_at"),
+    supabase.from("sponsors").select("*").order("sort_order"),
+    supabase.from("steam_games").select("*").order("created_at"),
+    supabase.from("gallery").select("*").order("created_at", { ascending: false }),
+    supabase.from("socials").select("*").eq("id", 1).maybeSingle(),
+    supabase.from("site_content").select("*"),
+  ]);
+  cache.portfolio = (p.data || []).map(portfolioToApp);
+  cache.products = (pr.data || []).map(productToApp);
+  cache.specs = (sp.data || []).map(specToApp);
+  cache.sponsors = (so.data || []).map(sponsorToApp);
+  cache.steam = (st.data || []).map(steamToApp);
+  cache.gallery = (ga.data || []).map(galleryToApp);
+  socialsCache.data = (soc.data?.data as Record<string, string>) || {};
+  siteCache.data = {};
+  for (const row of sc.data || []) siteCache.data[row.key] = row.value;
+  loaded = true;
+  emit();
+}
+export const isLoaded = () => loaded;
+
+/* ------- Read API (sync) ------- */
+export const getPortfolio = (cat?: string) =>
+  cat ? cache.portfolio.filter((i) => i.category === cat) : cache.portfolio;
+export const getProducts = (cat?: string) =>
+  cat ? cache.products.filter((i) => i.category === cat) : cache.products;
+export const getSpecs = () => cache.specs;
+export const getSponsors = () => cache.sponsors;
+export const getSteam = () => cache.steam;
+export const getGallery = () => cache.gallery;
+export const getSocials = () => socialsCache.data;
+export const getSiteContent = (key: string, fallback: any = null) =>
+  siteCache.data[key] ?? fallback;
+
+/* ------- Write API (admin only) ------- */
+function makeCrud(table: string, toDb: (d: any) => any) {
   return {
-    list: (filter?: (i: Item) => boolean) => {
-      const items = getItems<Item>(key);
-      return filter ? items.filter(filter) : items;
+    list: getPortfolio, // not used; pages call get* directly
+    add: async (data: Item) => {
+      await callAdmin({ action: "insert", table, payload: toDb(data) });
+      await loadAll();
     },
-    add: (item: Item) => {
-      const items = getItems<Item>(key);
-      const newItem = { ...item, id: generateId(), createdAt: new Date().toISOString() };
-      items.push(newItem);
-      setItems(key, items);
-      return newItem;
+    update: async (id: string | number, data: Item) => {
+      await callAdmin({ action: "update", table, id, payload: toDb(data) });
+      await loadAll();
     },
-    update: (id: number, data: Item) => {
-      const items = getItems<Item>(key);
-      const idx = items.findIndex((i) => i.id === id);
-      if (idx >= 0) {
-        items[idx] = { ...items[idx], ...data, updatedAt: new Date().toISOString() };
-        setItems(key, items);
-      }
-    },
-    remove: (id: number) => {
-      setItems(key, getItems<Item>(key).filter((i) => i.id !== id));
+    remove: async (id: string | number) => {
+      await callAdmin({ action: "delete", table, id });
+      await loadAll();
     },
   };
 }
 
-export const portfolioApi = makeCrud(STORAGE_KEYS.portfolio);
-export const productsApi = makeCrud(STORAGE_KEYS.products);
-export const specsApi = makeCrud(STORAGE_KEYS.specs);
-export const sponsorsApi = makeCrud(STORAGE_KEYS.sponsors);
-export const steamApi = makeCrud(STORAGE_KEYS.steam);
-export const galleryApi = makeCrud(STORAGE_KEYS.gallery);
+export const portfolioApi = makeCrud("portfolio", portfolioToDb);
+export const productsApi = makeCrud("products", productToDb);
+export const specsApi = makeCrud("specs", specToDb);
+export const sponsorsApi = makeCrud("sponsors", sponsorToDb);
+export const steamApi = makeCrud("steam_games", steamToDb);
 
-// Socials (single record)
-export function getSocials() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.socials);
-    return raw
-      ? JSON.parse(raw)
-      : { discord: "PaszczureQ", steamUrl: "", twitter: "", youtube: "", twitch: "", github: "" };
-  } catch {
-    return { discord: "PaszczureQ", steamUrl: "", twitter: "", youtube: "", twitch: "", github: "" };
-  }
-}
-export function setSocials(data: Record<string, string>) {
-  localStorage.setItem(STORAGE_KEYS.socials, JSON.stringify(data));
-  window.dispatchEvent(new Event("localdata-changed"));
+export const galleryApi = {
+  add: async (_data: any) => {
+    /* upload happens via uploadImage; this exists for back-compat */
+  },
+  remove: async (id: string | number) => {
+    await callAdmin({ action: "delete", table: "gallery", id });
+    await loadAll();
+  },
+};
+
+export async function uploadImage(file: File): Promise<string> {
+  if (file.size > 5_000_000) throw new Error("Max 5MB");
+  const base64 = await new Promise<string>((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const s = r.result as string;
+      res(s.split(",")[1]);
+    };
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+  const result = await callAdmin({
+    action: "upload",
+    payload: { base64, filename: file.name, contentType: file.type },
+  });
+  await loadAll();
+  return (result as { url: string }).url;
 }
 
-export function getPortfolio(category?: string) {
-  return portfolioApi.list(category ? (i) => i.category === category : undefined);
+export async function setSocials(data: Record<string, string>) {
+  await callAdmin({
+    action: "upsert", table: "socials",
+    payload: { id: 1, data, updated_at: new Date().toISOString() },
+  });
+  await loadAll();
 }
-export function getProducts(category?: string) {
-  return productsApi.list(category ? (i) => i.category === category : undefined);
-}
-export const getSpecs = () => specsApi.list();
-export const getSponsors = () => sponsorsApi.list();
-export const getSteam = () => steamApi.list();
-export const getGallery = () => galleryApi.list();
 
-export function seedInitialData() {
-  if (!localStorage.getItem(STORAGE_KEYS.portfolio)) {
-    setItems(STORAGE_KEYS.portfolio, [
-      {
-        id: 1,
-        title: "Iravis",
-        description: "My main company venture focused on gaming and tech innovation.",
-        category: "company",
-        imageUrl: "",
-        link: "",
-        featured: true,
-        order: 0,
-      },
-    ]);
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.steam)) {
-    setItems(STORAGE_KEYS.steam, [
-      { id: 1, appId: "730", name: "Counter-Strike 2", imageUrl: "https://cdn.cloudflare.steamstatic.com/steam/apps/730/header.jpg", hoursPlayed: "850.5", achievementsEarned: 120, achievementsTotal: 167, featured: true },
-      { id: 2, appId: "570", name: "Dota 2", imageUrl: "https://cdn.cloudflare.steamstatic.com/steam/apps/570/header.jpg", hoursPlayed: "320.0", achievementsEarned: 45, achievementsTotal: 150, featured: false },
-      { id: 3, appId: "252490", name: "Rust", imageUrl: "https://cdn.cloudflare.steamstatic.com/steam/apps/252490/header.jpg", hoursPlayed: "600.0", achievementsEarned: 80, achievementsTotal: 120, featured: true },
-    ]);
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.products)) {
-    setItems(STORAGE_KEYS.products, [
-      { id: 1, name: "G Pro X Superlight", brand: "Logitech", category: "mouse", description: "Ultra-lightweight wireless gaming mouse with HERO 25K sensor.", imageUrl: "", productUrl: "https://www.logitechg.com/", specs: { dpi: "25600", weight: "63g", sensor: "HERO 25K" }, rating: "4.8", featured: true },
-      { id: 2, name: "Wooting 60HE", brand: "Wooting", category: "keyboard", description: "Analog mechanical keyboard with rapid trigger.", imageUrl: "", productUrl: "https://wooting.io/", specs: { switches: "Lekker Analog", layout: "60%" }, rating: "4.9", featured: true },
-    ]);
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.specs)) {
-    setItems(STORAGE_KEYS.specs, [
-      { id: 1, gameName: "Counter-Strike 2", gameImage: "https://cdn.cloudflare.steamstatic.com/steam/apps/730/header.jpg", dpi: 800, sensitivity: "1.5", edpi: 1200, hz: 1000, zoomSens: "1.0", mouseAccel: false, rawInput: true, crosshair: "CSGO-uOiPj-s9oFJ-OCNd5-2N5yX-mO8WB", resolution: "1920x1080", aspectRatio: "16:9", scalingMode: "Fullscreen", mouse: "Logitech G Pro X Superlight", mousepad: "SteelSeries QcK Heavy", keyboard: "Wooting 60HE", headset: "HyperX Cloud II", monitor: "ZOWIE XL2566K 360Hz" },
-    ]);
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.sponsors)) {
-    setItems(STORAGE_KEYS.sponsors, [
-      { id: 1, name: "SteelSeries", description: "Premium gaming peripherals.", logoUrl: "", websiteUrl: "https://steelseries.com", couponCode: "PASZ10", discountText: "-10%", featured: true, order: 0 },
-      { id: 2, name: "GFUEL", description: "Energy drink formula for gamers.", logoUrl: "", websiteUrl: "https://gfuel.com", couponCode: "PASZCZUREQ", discountText: "-15%", featured: false, order: 1 },
-    ]);
-  }
+export async function setSiteContent(key: string, value: any) {
+  await callAdmin({
+    action: "upsert", table: "site_content",
+    payload: { key, value, updated_at: new Date().toISOString() },
+  });
+  await loadAll();
 }
+
+// No-op: kept so existing imports don't break
+export function seedInitialData() {}
