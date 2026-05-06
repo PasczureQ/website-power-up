@@ -1,0 +1,1 @@
+drop policy if exists "public read media" on storage.objects;
