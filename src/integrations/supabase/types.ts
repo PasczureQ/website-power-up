@@ -14,7 +14,255 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      gallery: {
+        Row: {
+          created_at: string
+          id: string
+          name: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string | null
+          url?: string
+        }
+        Relationships: []
+      }
+      portfolio: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          featured: boolean | null
+          id: string
+          image_url: string | null
+          link: string | null
+          sort_order: number | null
+          title: string
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          featured?: boolean | null
+          id?: string
+          image_url?: string | null
+          link?: string | null
+          sort_order?: number | null
+          title: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          featured?: boolean | null
+          id?: string
+          image_url?: string | null
+          link?: string | null
+          sort_order?: number | null
+          title?: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          brand: string | null
+          category: string | null
+          created_at: string
+          description: string | null
+          featured: boolean | null
+          id: string
+          image_url: string | null
+          name: string
+          product_url: string | null
+          rating: string | null
+          specs: Json | null
+          updated_at: string
+        }
+        Insert: {
+          brand?: string | null
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          featured?: boolean | null
+          id?: string
+          image_url?: string | null
+          name: string
+          product_url?: string | null
+          rating?: string | null
+          specs?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          brand?: string | null
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          featured?: boolean | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          product_url?: string | null
+          rating?: string | null
+          specs?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      site_content: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value?: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
+      socials: {
+        Row: {
+          data: Json
+          id: number
+          updated_at: string
+        }
+        Insert: {
+          data?: Json
+          id?: number
+          updated_at?: string
+        }
+        Update: {
+          data?: Json
+          id?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      specs: {
+        Row: {
+          created_at: string
+          data: Json | null
+          game_image: string | null
+          game_name: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json | null
+          game_image?: string | null
+          game_name: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json | null
+          game_image?: string | null
+          game_name?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sponsors: {
+        Row: {
+          coupon_code: string | null
+          created_at: string
+          description: string | null
+          discount_text: string | null
+          featured: boolean | null
+          id: string
+          logo_url: string | null
+          name: string
+          sort_order: number | null
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          coupon_code?: string | null
+          created_at?: string
+          description?: string | null
+          discount_text?: string | null
+          featured?: boolean | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          sort_order?: number | null
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          coupon_code?: string | null
+          created_at?: string
+          description?: string | null
+          discount_text?: string | null
+          featured?: boolean | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          sort_order?: number | null
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: []
+      }
+      steam_games: {
+        Row: {
+          achievements_earned: number | null
+          achievements_total: number | null
+          app_id: string | null
+          created_at: string
+          featured: boolean | null
+          hours_played: string | null
+          id: string
+          image_url: string | null
+          name: string
+        }
+        Insert: {
+          achievements_earned?: number | null
+          achievements_total?: number | null
+          app_id?: string | null
+          created_at?: string
+          featured?: boolean | null
+          hours_played?: string | null
+          id?: string
+          image_url?: string | null
+          name: string
+        }
+        Update: {
+          achievements_earned?: number | null
+          achievements_total?: number | null
+          app_id?: string | null
+          created_at?: string
+          featured?: boolean | null
+          hours_played?: string | null
+          id?: string
+          image_url?: string | null
+          name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
